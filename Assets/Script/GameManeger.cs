@@ -4,18 +4,17 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using TMPro;
 using System.Threading.Tasks;
+using static GameData;
 
 public class GameManeger : MonoBehaviour
 {
     public static GameManeger Instance;
     public List<SmallFood> foods {get; private set;}
     public List<Ghost> ghosts {get; private set;}
-    public List<Ghost> atHomeGhosts {get; private set;}
     public List<Transform> livePrefabs {get; private set;}
     public Pacman pacman;
     public TextMeshProUGUI scoreTXT;
     public TextMeshProUGUI highScoreTXT;
-
     public TextMeshProUGUI LabelTXT;
 
     public Transform insideHome;
@@ -46,15 +45,16 @@ public class GameManeger : MonoBehaviour
             Destroy(this);
         }
         DontDestroyOnLoad(this);
+        
         foods = new List<SmallFood>();
         ghosts = new List<Ghost>();
-        atHomeGhosts = new List<Ghost>();
         livePrefabs = new List<Transform>();
         high_Socre = 0;
         
     }
     void Start()
     {
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_StartSound);
         if(LoadGame())
         {
             ContinueGame();
@@ -81,7 +81,8 @@ public class GameManeger : MonoBehaviour
 
     public bool LoadGame()
     {
-        GameData gameData = SaveSystem.Instance.LoadGame();
+        GameData gameData = SaveSystem.Instance.LoadGameData();
+        List<GhostData> ghostDatas = SaveSystem.Instance.LoadGhostList(ghosts.Count);
         if(gameData.hadData)
         {
             this.liveCount = gameData.live;
@@ -93,23 +94,9 @@ public class GameManeger : MonoBehaviour
             }
             for (int i = 0; i < ghosts.Count; i++)
             {
-                ghosts[i].transform.position = gameData.ghostDatas[i].ghosts_Pos;
-                ghosts[i].movement.ChangeDir(gameData.ghostDatas[i].CurrentDirection);
-                switch (gameData.ghostDatas[i].ghosts_Behaviour)
-                {
-                    case 0:
-                        ghosts[i].behaviour = Ghost.Behaviour.GhostScatter;
-                        break;
-                    case  1:
-                        ghosts[i].behaviour = Ghost.Behaviour.GhostChase;
-                        break;
-                    case  2:
-                        ghosts[i].behaviour = Ghost.Behaviour.GhostSpooked;
-                        break;
-                    case  3:
-                        ghosts[i].behaviour = Ghost.Behaviour.GhostHome;
-                        break;
-                }
+                ghosts[i].transform.position = ghostDatas[i].ghostsPos;
+                ghosts[i].movement.ChangeDir(ghostDatas[i].CurrentDirection);
+                ghosts[i].behaviour = (Ghost.Behaviour)ghostDatas[i].ghostsBehaviour;
             }
             this.pacman.transform.position = gameData.pacman_Pos;
             return true;
@@ -119,52 +106,40 @@ public class GameManeger : MonoBehaviour
 
     public void SaveGame()
     {
-        GameData gameData = new GameData();
-        Vector3 pacman_Pos = this.pacman.transform.position;
-        List<GhostData> ghostDatas = new List<GhostData>();
-        List<int> newfoods = new List<int>();
+        GameData gameData = new GameData(); 
+        gameData.score = score;
+        gameData.high_Socre = high_Socre;
+        gameData.live = liveCount;
+        gameData.pacman_Pos = this.pacman.transform.position;
+        List<int> foodlists = new List<int>();
         foreach (var food in foods)
         {
-            if(food.gameObject.activeSelf == false) newfoods.Add(0);
-            else newfoods.Add(1);
+            if(food.gameObject.activeSelf == false) foodlists.Add(0);
+            else foodlists.Add(1);
         }
+        gameData.foods = foodlists;
+        SaveSystem.Instance.SaveGame(gameData);
+
+        List<GhostData> ghostDatas = new List<GhostData>();
         for (int i = 0; i < ghosts.Count; i++)
         {
             GhostData data = new GhostData();
-            data.ghosts_Pos = ghosts[i].transform.position;
+            data.ghostsPos = ghosts[i].transform.position;
             data.CurrentDirection = ghosts[i].movement.CurrentDirection;
-            switch (ghosts[i].behaviour)
-            {
-                case Ghost.Behaviour.GhostScatter:
-                    data.ghosts_Behaviour = 0;
-                    break;
-                case  Ghost.Behaviour.GhostChase:
-                    data.ghosts_Behaviour= 1;
-                    break;
-                case Ghost.Behaviour.GhostSpooked:
-                    data.ghosts_Behaviour = 2;
-                    break;
-                case Ghost.Behaviour.GhostHome:
-                    data.ghosts_Behaviour = 3;
-                    break;
-            }
+            data.ghostsBehaviour = (int)ghosts[i].behaviour;
             ghostDatas.Add(data);
         }
-        gameData.PutData(score,high_Socre,liveCount,newfoods,ghostDatas,pacman_Pos);
-        SaveSystem.Instance.SaveGame(gameData);
+        SaveSystem.Instance.SaveList(ghostDatas);
     }
 
     async public void GameStart()
     {
-        gameRunning = true;
         LabelTXT.SetText("START");
-        await Task.Delay(1000);
+        await Task.Delay(200);    
+        NewGame();
         LabelTXT.SetText("");
-        score = 0;
-        scoreTXT.SetText("0");
-        highScoreTXT.SetText(high_Socre.ToString());
-        setupLive();
         pause = false;
+        gameRunning = true;
     }
 
     void Update() {
@@ -187,10 +162,28 @@ public class GameManeger : MonoBehaviour
 
     void NewGame()
     {
-        NewRound();
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_StartSound);
+        highScoreTXT.SetText(high_Socre.ToString());
+        score = 0;
+        scoreTXT.SetText("0");
         liveCount = 3;
-        gameRunning = false;
-        LabelTXT.SetText("CONTINUE?");
+        gameRunning = false;  
+        powerMode = false;
+        powerModeDuration = 0;
+        foreach (var food in foods)
+        {
+            food.gameObject.SetActive(true);
+        }
+        foreach (var ghost in ghosts)
+        {
+            ghost.Restart();
+        }
+        pacman.Restart();
+        foreach (var ghost in ghosts)
+        {
+            ghost.gameObject.SetActive(true);
+        }
+        setupLive();
     }
 
     void ContinueGame()
@@ -198,6 +191,8 @@ public class GameManeger : MonoBehaviour
         powerMode = false;
         powerModeDuration = 0;
         LabelTXT.SetText("PAUSE");
+        scoreTXT.SetText(score.ToString());
+        highScoreTXT.SetText(high_Socre.ToString());
         gameRunning = true;
         pause = true;
         setupLive();
@@ -209,15 +204,30 @@ public class GameManeger : MonoBehaviour
 
     void NewRound()
     {
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_StartSound);
+        powerMode = false;
+        powerModeDuration = 0;
         foreach (var food in foods)
         {
             food.gameObject.SetActive(true);
         }
-        Restart();
+        foreach (var ghost in ghosts)
+        {
+            ghost.Restart();
+        }
+        pacman.Restart();
+        foreach (var ghost in ghosts)
+        {
+            ghost.gameObject.SetActive(true);
+        }
+        setupLive();
+        LabelTXT.SetText("");
+        gameRunning = true;
     }
 
     void Restart()
     {
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_StartSound);
         powerMode = false;
         powerModeDuration = 0;
         foreach (var ghost in ghosts)
@@ -225,14 +235,13 @@ public class GameManeger : MonoBehaviour
             ghost.Restart();
         }
         pacman.Restart();
-        atHomeGhosts.Clear();
         foreach (var ghost in ghosts)
         {
             ghost.gameObject.SetActive(true);
         }
     }
 
-    void GameOver()
+    async void GameOver()
     {
         pause = true;
         foreach (var food in foods)
@@ -246,10 +255,23 @@ public class GameManeger : MonoBehaviour
         pacman.gameObject.SetActive(false);
         if(score > high_Socre) high_Socre = score;
         LabelTXT.SetText("GAMEOVER");
-        Invoke(nameof(NewGame),2f);
+        await Task.Delay(1000);
+        LabelTXT.SetText("CONTINUE?");
+        gameRunning = false;
     }
     void setupLive()
     {
+        if(livePrefabs.Count > 0)
+        {
+            for (int i = 0; i < livePrefabs.Count; i++)
+            {
+                Transform prefab = livePrefabs[i];
+                prefab.gameObject.SetActive(false);
+                livePrefabs.Remove(prefab);  
+                Destroy(prefab.gameObject);
+            }
+        }
+
         for (int i = 0; i < liveCount; i++)
         {
             Transform prefab = Instantiate(livePrefab,new Vector3(liveUI_Pos.position.x + 2 * i,liveUI_Pos.position.y,0),Quaternion.identity);
@@ -267,6 +289,7 @@ public class GameManeger : MonoBehaviour
     {
         liveCount--;
         Transform prefab = livePrefabs[liveCount];
+        prefab.gameObject.SetActive(false);
         livePrefabs.Remove(prefab);  
 
         Destroy(prefab.gameObject);
@@ -274,7 +297,8 @@ public class GameManeger : MonoBehaviour
 
     public void PacmanEaten()
     {
-        
+        SoundManeger.Instance.StopMusic();
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_Death);
         RemoveALive();
         foreach (var ghost in ghosts)
         {
@@ -282,8 +306,7 @@ public class GameManeger : MonoBehaviour
         }
 
         if(liveCount > 0)
-        {
-            
+        {   
             Invoke(nameof(Restart),2f);
         }
         else
@@ -293,12 +316,20 @@ public class GameManeger : MonoBehaviour
     }
     public void PacmanPowerMode(float duration)
     {
+        SoundManeger.Instance.PlayMusic(SoundManeger.PlayList.Pacman_Power);
         if(powerMode)
         {
             powerModeDuration += duration;
             foreach (var ghost in ghosts)
             {
-                ghost.Spooked();
+                if(ghost.behaviour == Ghost.Behaviour.GhostHome)
+                {
+                    ghost.isSpooked = true;
+                }
+                else
+                {
+                    ghost.Spooked();
+                }
             }
         }
         else
@@ -307,9 +338,14 @@ public class GameManeger : MonoBehaviour
             powerMode = true;
             foreach (var ghost in ghosts)
             {
-                if(!atHomeGhosts.Contains(ghost) && ghost.behaviour == Ghost.Behaviour.GhostHome) atHomeGhosts.Add(ghost);
-                ghost.behaviour = Ghost.Behaviour.GhostSpooked;
-                ghost.Spooked();
+                if(ghost.behaviour == Ghost.Behaviour.GhostHome)
+                {
+                    ghost.isSpooked = true;
+                }
+                else
+                {
+                    ghost.Spooked();
+                }
             }
         }
     }
@@ -317,42 +353,44 @@ public class GameManeger : MonoBehaviour
     public void PacmanPowerLastSec()
     {
         foreach (var ghost in ghosts)
-        {           
-            ghost.blinky = true;
+        {          
+            if(ghost.behaviour == Ghost.Behaviour.GhostSpooked) 
+            {
+                ghost.blinky = true;
+            }
         }
     }
 
     public void PacmanPowerDown()
     {
+        SoundManeger.Instance.StopMusic();
         GhostMultiplier = 0;
         powerMode = false;
         foreach (var ghost in ghosts)
         {
             ghost.UnSpooked();
-            if(atHomeGhosts.Contains(ghost))
-            {
-                ghost.behaviour = Ghost.Behaviour.GhostHome;
-                continue;
-            } 
-            ghost.behaviour = Ghost.Behaviour.GhostScatter;
+            if(ghost.behaviour == Ghost.Behaviour.GhostHome) continue;
+            ghost.behaviour = Ghost.Behaviour.GhostScatter;  
+            ghost.ghostBehaviour.currentBehaviour = 0; 
         }    
-        atHomeGhosts.Clear();
     }
 
     public void GhostEaten(Ghost ghost)
     {
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_EatGhost);
         GhostMultiplier++;
-        atHomeGhosts.Add(ghost);
         SetScore(ghost.point * GhostMultiplier);
     }
 
     public void SmallFoodEaten(SmallFood smallFood)
     {
+        SoundManeger.Instance.PlaySound(SoundManeger.PlayList.Pacman_Chomp);
         smallFood.transform.gameObject.SetActive(false);
         SetScore(smallFood.point);
         if(!HasRemainingFood())
         {
-            Invoke(nameof(NewRound),3f);
+            SoundManeger.Instance.StopMusic();
+            Invoke(nameof(NewRound),2f);
         }
     }
 

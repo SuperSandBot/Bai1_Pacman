@@ -35,20 +35,57 @@ public class SaveSystem : MonoBehaviour
         file.Close();
     }
 
-    public GameData LoadGame()
+    public void SaveList(List<GhostData> ghostDatas)
+    {
+        for (int i = 0; i < ghostDatas.Count; i++)
+        {
+            if(!Directory.Exists(Application.persistentDataPath +"/game_save"))
+            {
+                Directory.CreateDirectory(Application.persistentDataPath +"/game_save");
+            }
+            BinaryFormatter bf = new BinaryFormatter();
+            FileStream file = File.Create(Application.persistentDataPath +"/game_save/game_ghost "+i+"data.txt");
+            var json = JsonUtility.ToJson(ghostDatas[i]);
+            bf.Serialize(file,json);
+        }
+    }
+
+    public List<GhostData> LoadGhostList(int count)
+    {
+        List<GhostData> ghostDatas = new List<GhostData>();
+        for(int i = 0; i < count; i++)
+        {
+            GhostData ghostData = new GhostData();
+            if(!Directory.Exists(Application.persistentDataPath +"/game_save"))
+            {
+                Debug.Log("wow");
+                return ghostDatas;
+            }  
+            if(File.Exists(Application.persistentDataPath +"/game_save/game_ghost "+i+"data.txt"))
+            {
+                BinaryFormatter bf = new BinaryFormatter();
+                FileStream file = File.Open(Application.persistentDataPath +"/game_save/game_ghost "+i+"data.txt",FileMode.Open);
+                JsonUtility.FromJsonOverwrite((string)bf.Deserialize(file),ghostData);
+                ghostDatas.Add(ghostData);
+                file.Close();
+            } 
+        }
+        return ghostDatas;
+    }
+
+    public GameData LoadGameData()
     {
         GameData gameData = new GameData();
         if(!Directory.Exists(Application.persistentDataPath +"/game_save"))
         {
             Debug.Log("wow");
             return gameData;
-        } 
-        BinaryFormatter bf = new BinaryFormatter();
+        }  
         if(File.Exists(Application.persistentDataPath +"/game_save/game_data.txt"))
         {
+            BinaryFormatter bf = new BinaryFormatter();
             FileStream file = File.Open(Application.persistentDataPath +"/game_save/game_data.txt",FileMode.Open);
             JsonUtility.FromJsonOverwrite((string)bf.Deserialize(file),gameData);
-            Debug.Log(gameData.hadData.ToString());
             file.Close();
         } 
         return gameData;

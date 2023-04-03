@@ -34,15 +34,15 @@ public class GhostBehaviour : MonoBehaviour
     public void NextBehaviour()
     {
         if(GameManeger.Instance.pause) return;
-        if(ghost.behaviour == Ghost.Behaviour.GhostSpooked) return;
         if(ghost.behaviour == Ghost.Behaviour.GhostHome && ghost.respawning == false)
         {
             ExitDoor();
             return;
         }
+        if(ghost.behaviour == Ghost.Behaviour.GhostSpooked || ghost.behaviour == Ghost.Behaviour.GhostHome) return;
 
         currentBehaviour++;
-        if(currentBehaviour >= 1) currentBehaviour = 0;
+        if(currentBehaviour > 1) currentBehaviour = 0;
         switch (currentBehaviour)
         {
             case 0:
@@ -79,8 +79,8 @@ public class GhostBehaviour : MonoBehaviour
 
     void OnCollisionEnter2D(Collision2D other)
     {
-        Ghost ghost = other.gameObject.GetComponent<Ghost>();
-        if(ghost != null)
+        Ghost otherGhost = other.gameObject.GetComponent<Ghost>();
+        if(otherGhost != null)
         {
             ghost.movement.ChangeDir(-ghost.movement.CurrentDirection);
         }
@@ -119,9 +119,6 @@ public class GhostBehaviour : MonoBehaviour
         ghost.transform.position = insideHome.position; 
         ghost.movement.rb2d.isKinematic = true;
         ghost.movement.MoveUp();
-        await Task.Delay(550);
-        ghost.transform.position = outsideHome.position; 
-        ghost.movement.rb2d.isKinematic = false;
         if(ghost.isSpooked)
         {
             ghost.behaviour = Ghost.Behaviour.GhostSpooked;
@@ -130,6 +127,9 @@ public class GhostBehaviour : MonoBehaviour
         {
             ghost.behaviour = Ghost.Behaviour.GhostScatter;
         }
+        await Task.Delay(550);
+        ghost.transform.position = outsideHome.position; 
+        ghost.movement.rb2d.isKinematic = false;
         ghost.movement.ChangeDir(Vector2.right);
     }
 
@@ -137,6 +137,13 @@ public class GhostBehaviour : MonoBehaviour
     {
         Vector2 farestdir = availableDirection[0];
         float distance = Vector2.Distance(pacman.transform.position,transform.position + new Vector3(availableDirection[0].x,availableDirection[0].y));
+        if(distance > 6)
+        {
+            int index = Random.Range(0,availableDirection.Count);
+            ghost.movement.ChangeDir(availableDirection[index]);
+            availableDirection.Clear();
+            return;
+        }
         if(availableDirection.Count > 1)
         {
             foreach (var dir in availableDirection)

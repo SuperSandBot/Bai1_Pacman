@@ -118,11 +118,11 @@ public class Ghost : MonoBehaviour
     public void Eated()
     {
         GameManeger.Instance.GhostEaten(this);
-        
         this.transform.position = ghostBehaviour.insideHome.position;
         behaviour = Behaviour.GhostHome;
-        respawnTime = 7;
+        respawnTime = 4;
         respawning = true;
+        isSpooked = false;
         Invoke(nameof(Respawn),respawnTime);
     }
 
@@ -134,15 +134,12 @@ public class Ghost : MonoBehaviour
             return;
         }
         respawning = false;
-        if(!isSpooked)
-        {
-            behaviour = Behaviour.GhostHome;
-        }
     }
 
     public void Spooked()
     {
         isSpooked = true;
+        behaviour = Ghost.Behaviour.GhostSpooked;
         blinky = false;
         currentSprite = 0;
     }

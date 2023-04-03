@@ -14,11 +14,14 @@ public class Movement : MonoBehaviour
     public Vector2 NextDirection  {get; private set;}
 
     public bool movemtEnabled = true;
+    void Awake()
+    {
+        StartPosition = transform.position;
+    }
 
     void Start()
     {
         rb2d = this.transform.GetComponent<Rigidbody2D>();
-        StartPosition = transform.position;
         StartDirection = Vector2.left;
         CurrentDirection = StartDirection;
         NextDirection = Vector2.zero;
