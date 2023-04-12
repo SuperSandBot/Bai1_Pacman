@@ -11,7 +11,7 @@ public class GhostBehaviour : MonoBehaviour
     public int currentBehaviour = 0;
     
     public float startDelay;
-    float behaviourtime = 7f;
+    float behaviourtime = 9f;
     public Transform insideHome {get; private set;}
     public Transform outsideHome {get; private set;}
     public List<Vector2> availableDirection {get; private set;}
@@ -42,7 +42,7 @@ public class GhostBehaviour : MonoBehaviour
         if(ghost.behaviour == Ghost.Behaviour.GhostSpooked || ghost.behaviour == Ghost.Behaviour.GhostHome) return;
 
         currentBehaviour++;
-        if(currentBehaviour > 1) currentBehaviour = 0;
+        if(currentBehaviour > 1) currentBehaviour = 1;
         switch (currentBehaviour)
         {
             case 0:
@@ -90,7 +90,7 @@ public class GhostBehaviour : MonoBehaviour
     {
         Vector2 Nearestdir = availableDirection[0];
         float distance = Vector2.Distance(pacman.transform.position,transform.position + new Vector3(availableDirection[0].x,availableDirection[0].y));
-        if(availableDirection.Count > 1)
+        if(availableDirection.Count > 0)
         {
             foreach (var dir in availableDirection)
             {
@@ -144,7 +144,7 @@ public class GhostBehaviour : MonoBehaviour
             availableDirection.Clear();
             return;
         }
-        if(availableDirection.Count > 1)
+        if(availableDirection.Count > 0)
         {
             foreach (var dir in availableDirection)
             {
